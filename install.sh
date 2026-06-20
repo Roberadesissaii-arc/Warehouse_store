@@ -33,7 +33,7 @@ done
 
 trap stop_sudo_keepalive EXIT
 
-TOTAL_STEPS=7
+TOTAL_STEPS=8
 if [ -t 1 ]; then clear 2>/dev/null || true; fi
 printf '\n  %sW A R E H O U S E%s\n%s' "$DIM" "$RESET" "$GREEN"
 cat <<'ART'
@@ -102,6 +102,7 @@ EOF
   sudo docker compose up -d --build
   echo
   ok "Store running (Docker) — http://127.0.0.1:${UI_PORT}"
+  open_firewall_port "$UI_PORT" "Warehouse Store"
   note "logs: docker compose logs -f store"
   exit 0
 fi
@@ -179,6 +180,9 @@ if $INSTALL_SERVICE; then
 else
   note "Start manually: $STORE_ROOT/run.sh"
 fi
+
+step "Firewall"
+open_firewall_port "$UI_PORT" "Warehouse Store"
 
 echo
 echo "  ${GREEN}${BOLD}✓ Warehouse Store ready${RESET}"
