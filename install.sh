@@ -33,8 +33,23 @@ done
 
 trap stop_sudo_keepalive EXIT
 
-echo "==> Warehouse Store install"
-echo "    store app: $STORE_ROOT"
+if [ -t 1 ]; then
+  GREEN=$'\033[1;32m'; BOLD=$'\033[1m'; DIM=$'\033[2m'; RESET=$'\033[0m'
+else
+  GREEN=''; BOLD=''; DIM=''; RESET=''
+fi
+
+printf '\n%s' "$GREEN"
+cat <<'ART'
+__      ___   ___ ___ _  _  ___  _   _ ___ ___   ___ _____ ___  ___ ___
+\ \    / /_\ | _ \ __| || |/ _ \| | | / __| __| / __|_   _/ _ \| _ \ __|
+ \ \/\/ / _ \|   / _|| __ | (_) | |_| \__ \ _|  \__ \ | || (_) |   / _|
+  \_/\_/_/ \_\_|_\___|_||_|\___/ \___/|___/___| |___/ |_| \___/|_|_\___|
+ART
+printf '%s\n' "$RESET"
+echo "  ${DIM}Customer storefront for your warehouse — your shop, your control.${RESET}"
+echo "  ${DIM}store app: $STORE_ROOT${RESET}"
+echo
 
 ensure_sudo
 apt_bootstrap
@@ -140,6 +155,10 @@ else
 fi
 
 echo
-echo "==> Done. Storefront: http://127.0.0.1:${UI_PORT}"
-echo "    Optional domain tunnel: deploy/CLOUDFLARE-TUNNEL.md"
+echo "  ${GREEN}${BOLD}✓ Warehouse Store ready${RESET}"
+echo
+echo "    ${BOLD}Storefront${RESET}     http://<server-ip>:${UI_PORT}"
+echo "    ${BOLD}API${RESET}            http://127.0.0.1:${API_PORT}/api/health"
+echo "    ${BOLD}Service${RESET}        systemctl status warehouse-store"
+echo "    ${BOLD}Public domain${RESET}  deploy/CLOUDFLARE-TUNNEL.md"
 echo

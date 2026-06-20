@@ -1,93 +1,146 @@
 # Warehouse Store
 
-Customer-facing Next.js storefront with a Flask API. Connects to WarehouseDB for inventory.
+**Your shop, your control.** Self-hosted.
 
-## Server install (Ubuntu / Debian / Raspberry Pi)
+The customer-facing storefront for your warehouse — browse products, fill a bag, and place
+orders that drop straight into the **WarehouseDB** pick queue for the robots. A Next.js front
+end with a small Flask API for customer accounts and checkout.
 
-**Prerequisites:** a Linux server (Ubuntu/Debian or Raspberry Pi OS) with `git` and `sudo`. The installer pulls in everything else (Node 22, pnpm, Python). **WarehouseDB** must be reachable — it provides the products.
+> Needs **WarehouseDB** reachable (it provides the products and receives orders).
 
-Run this **once** after cloning — it installs everything and keeps the app running on every reboot:
+| App | Folder | Port |
+|-----|--------|------|
+| **Store** (this repo) | `.` | 5001 storefront · 5004 API |
+| WarehouseDB | `../WarehouseDB` | 8000 |
+| Scan | `../Warehouse_scan` | 5002 · 5003 |
+
+## What you get
+
+| Area | Description |
+|------|-------------|
+| Storefront | Home, product browsing, and search backed by WarehouseDB inventory |
+| Bag & checkout | Add to bag, place an order — lines queue as robot picks in WarehouseDB |
+| Accounts | Customer sign-up / sign-in, stored in a local SQLite database |
+| Account settings | Profile, preferences, password, notifications, and pick history |
+| Order history | Per-customer pick history with live status |
+| Public access | Optional Cloudflare tunnel for a public storefront URL |
+
+## Prerequisites
+
+A Linux server or Raspberry Pi (Debian/Ubuntu) with `git` and `sudo`. The installer pulls in
+everything else (Node 22, pnpm, Python). **WarehouseDB** must be reachable — it provides the
+products. (Windows is supported for local development — see below.)
+
+## Quick start
 
 ```bash
-git clone <your-repo-url> warehouse            # or copy the project onto the server
-cd warehouse/Warehouse_store                    # the folder that holds install.sh
-chmod +x install.sh run.sh start.sh
+git clone https://github.com/Roberadesissaii-arc/Warehouse_store.git
+cd Warehouse_store
+chmod +x install.sh
 ./install.sh
 ```
 
-`./install.sh` will:
+`./install.sh` will, in one shot:
 
-1. Ask for **sudo** (apt update/upgrade, Node 22, pnpm, cloudflared)
-2. Create a Python virtualenv + install the API, and generate `.env.local` with a random secret
-3. Pick free ports (storefront **5001**, API **5004**) and build the production app
-4. Register a **systemd service** (`systemctl enable --now`) — so the storefront + API **start immediately and again automatically on every boot**, and restart on crash
+1. Install system deps (apt update, Node 22, pnpm, Python venv, `cloudflared`)
+2. Create the Python virtualenv and install the API
+3. Generate `.env.local` with a random secret and free ports (storefront **5001**, API **5004**)
+4. Build the production app
+5. Register a **systemd service** (`systemctl enable --now warehouse-store`) — it **starts now
+   and again on every boot**, and restarts on crash
 
-Open **http://\<server-ip\>:5001**.
+When it finishes it prints the URL, e.g. `http://<server-ip>:5001`.
 
-> You run `install.sh` **once**. After that the app is always on — **you never start it manually**.
+> You run `install.sh` **once**. After that the storefront is always on — **you never start
+> it by hand.** Re-run it anytime to update after `git pull`.
 
 ```bash
-# After pulling code updates — rebuild + restart:
-git pull && ./install.sh
+./install.sh --no-service   # install only — start by hand with ./run.sh
+./install.sh --docker       # run with Docker instead of native
+```
 
-# Manage the always-on service:
+After install, point `WAREHOUSE_URL` in `.env.local` at your WarehouseDB host (LAN URL or its
+Cloudflare tunnel) and make sure `STORE_API_KEY` matches WarehouseDB.
+
+**First sign-in:** no preset login — create the store owner account (name, email, password)
+on the sign-in page when the database is empty.
+
+## Managing the service
+
+```bash
 systemctl status warehouse-store          # is it running?
 sudo systemctl restart warehouse-store    # restart now
 sudo systemctl stop warehouse-store       # stop until next boot
 sudo systemctl disable warehouse-store    # stop auto-starting on boot
 journalctl -u warehouse-store -f          # live logs
+
+git pull && ./install.sh                  # update after pulling new code
 ```
 
-Install options:
+## Public access (Cloudflare tunnel)
 
-```bash
-./install.sh --no-service   # install only — start by hand with ./run.sh
-./install.sh --docker       # Docker instead of native
-```
+Optional public domain: see [deploy/CLOUDFLARE-TUNNEL.md](deploy/CLOUDFLARE-TUNNEL.md).
 
-**First sign-in:** no preset login. Create the one store owner account (name, email, password) on the sign-in page when the database is empty.
+## Development (Windows / macOS / Linux)
 
-Set `WAREHOUSE_URL` in `.env.local` to your WarehouseDB host (or Cloudflare tunnel URL). Match `STORE_API_KEY` with WarehouseDB. Optional public domain: `deploy/CLOUDFLARE-TUNNEL.md`
+Two processes — the Next.js UI and the Flask API. **Needs WarehouseDB on port 8000** for products.
 
-## Run locally (development)
-
-**Windows — always use these scripts** (not `pnpm dev` alone):
+**Windows — use the scripts** (not `pnpm dev` alone):
 
 ```powershell
 cd Warehouse_store
-.\status.ps1   # see what is running and which folder
-.\stop.ps1     # stop Store UI + API
+.\status.ps1   # what is running and from which folder
 .\dev.ps1      # start API (new window) + UI together
+.\stop.ps1     # stop Store UI + API
 ```
 
-**How to know it is the correct app**
-
-- Browser tab title: **Warehouse Store**
-- Header logo: **Warehouse Store** (teal square mark)
-- Bottom bar: **Home · Browse · Bag · Account**
-- URL: `http://127.0.0.1:5001` (or your PC IP `:5001`)
-- API check: `http://127.0.0.1:5004/api/health` should show `app: store-api` and database under `Warehouse_store\instance\`
-
-**Needs WarehouseDB** on port **8000** for products:
-
-```powershell
-cd ..\WarehouseDB
-python run.py
-```
+**macOS / Linux — two terminals:**
 
 ```bash
 cd Warehouse_store
 cp .env.local.example .env.local
 pnpm install
-pnpm dev          # UI :5001
-pnpm dev:api      # API :5004 (second terminal)
+pnpm dev          # storefront → http://localhost:5001
+pnpm dev:api      # API → http://localhost:5004 (second terminal)
 ```
 
-## Stack
+**Confirm it's the right app:** tab title **Warehouse Store**, teal square logo, bottom bar
+**Home · Browse · Bag · Account**, and `http://127.0.0.1:5004/api/health` shows `app: store-api`.
+
+## Environment (`.env.local`)
+
+Generated on install. Key values:
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `WAREHOUSE_URL` | `http://127.0.0.1:8000` | WarehouseDB host (products + orders) |
+| `STORE_API_KEY` | `store-dev-key` | Must match WarehouseDB's `STORE_API_KEY` |
+| `STORE_SECRET_KEY` | *(generated)* | Flask session signing |
+| `STORE_PORT` / `STORE_HOST` | `5001` / `0.0.0.0` | Storefront port and bind |
+| `STORE_API_PORT` | `5004` | Flask API (proxied by Next.js) |
+| `STORE_BACKEND_URL` | `http://127.0.0.1:5004` | API origin used by the Next.js proxy |
+
+See `.env.local.example` for the full list.
+
+## Project layout
+
+```
+Warehouse_store/
+├── app/                  # Next.js App Router (storefront UI)
+│   └── api/[[...path]]/   # Proxy route → Flask API
+├── components/           # React UI (browse, bag, account/settings)
+├── backend/              # Flask API
+│   └── app/              # routes, models (customer, picks), services
+├── deploy/               # install lib, systemd unit, Cloudflare guide
+├── install.sh            # one-shot installer
+└── instance/             # SQLite database (gitignored)
+```
 
 | Layer | Tech |
 |-------|------|
 | UI | Next.js 16, React 19 |
-| API | Flask (`backend/`) → WarehouseDB |
+| API | Flask + SQLite (`backend/`) → WarehouseDB |
 
-License: MIT — see `LICENSE`.
+License: [MIT](LICENSE)
+
+Warehouse Store — built for the warehouse you own.
