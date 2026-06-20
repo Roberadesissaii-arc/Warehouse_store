@@ -1,0 +1,27 @@
+# Warehouse Store — Docker (native alternative: ./install.sh)
+#
+#   ./install.sh --docker
+#   # or: docker compose up --build -d
+
+services:
+  store:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: warehouse-store:latest
+    container_name: warehouse-store
+    command: ["sh", "start.sh"]
+    ports:
+      - "${STORE_PORT:-5001}:5001"
+      - "${STORE_API_PORT:-5004}:5004"
+    env_file:
+      - .env.local
+    environment:
+      STORE_API_HOST: 0.0.0.0
+      STORE_HOST: 0.0.0.0
+    volumes:
+      - store_data:/app/instance
+    restart: unless-stopped
+
+volumes:
+  store_data:

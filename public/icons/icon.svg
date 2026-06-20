@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Warehouse Store">
+  <defs>
+    <linearGradient id="bg" x1="8%" y1="8%" x2="92%" y2="92%">
+      <stop offset="0%" stop-color="#0f766e"/>
+      <stop offset="100%" stop-color="#14b8a6"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <g transform="translate(106 106) scale(12.5)" fill="none" stroke="#ffffff" stroke-width="2.56" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M16.5 9.4 7.55 4.24"/>
+    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+    <path d="M3.27 6.96 12 12.01l8.73-5.05"/>
+    <path d="M12 22.08V12"/>
+  </g>
+</svg>

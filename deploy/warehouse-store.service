@@ -1,0 +1,20 @@
+[Unit]
+Description=Warehouse Store (Next.js + Flask API)
+Documentation=file://@ROOT@/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=@USER@
+WorkingDirectory=@ROOT@
+EnvironmentFile=-@ROOT@/.env.local
+EnvironmentFile=-@ROOT@/instance/install.env
+Environment=PATH=@VENV@/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=@ROOT@/start.sh
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target
