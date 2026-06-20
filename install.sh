@@ -33,16 +33,20 @@ done
 
 trap stop_sudo_keepalive EXIT
 
-printf '\n%s' "$GREEN"
+TOTAL_STEPS=7
+if [ -t 1 ]; then clear 2>/dev/null || true; fi
+printf '\n  %sW A R E H O U S E%s\n%s' "$DIM" "$RESET" "$GREEN"
 cat <<'ART'
-__      ___   ___ ___ _  _  ___  _   _ ___ ___   ___ _____ ___  ___ ___
-\ \    / /_\ | _ \ __| || |/ _ \| | | / __| __| / __|_   _/ _ \| _ \ __|
- \ \/\/ / _ \|   / _|| __ | (_) | |_| \__ \ _|  \__ \ | || (_) |   / _|
-  \_/\_/_/ \_\_|_\___|_||_|\___/ \___/|___/___| |___/ |_| \___/|_|_\___|
+  ███████╗████████╗ ██████╗ ██████╗ ███████╗
+  ██╔════╝╚══██╔══╝██╔═══██╗██╔══██╗██╔════╝
+  ███████╗   ██║   ██║   ██║██████╔╝█████╗
+  ╚════██║   ██║   ██║   ██║██╔══██╗██╔══╝
+  ███████║   ██║   ╚██████╔╝██║  ██║███████╗
+  ╚══════╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝╚══════╝
 ART
 printf '%s\n' "$RESET"
-echo "  ${DIM}Customer storefront for your warehouse — your shop, your control.${RESET}"
-echo "  ${DIM}store app: $STORE_ROOT${RESET}"
+echo "  ${BOLD}Warehouse Store${RESET}  ${DIM}— customer storefront${RESET}                    ${DIM}self-hosted${RESET}"
+echo "  ${DIM}──────────────────────────────────────────────────────────${RESET}"
 echo
 
 step "System packages & toolchain"
