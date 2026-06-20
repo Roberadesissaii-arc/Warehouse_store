@@ -64,6 +64,17 @@ if [ "$UI_PORT" = "$API_PORT" ]; then
 fi
 ok "Ports — storefront $UI_PORT, API $API_PORT"
 
+# STORE_API_KEY must match WarehouseDB's. Reuse the hub's key if WarehouseDB is on
+# this machine; otherwise generate a strong one (set the same value on WarehouseDB).
+WH_ENV="$(cd "$STORE_ROOT/.." && pwd)/WarehouseDB/instance/warehousedb.env"
+if [ -f "$WH_ENV" ] && grep -q '^STORE_API_KEY=' "$WH_ENV"; then
+  STORE_KEY="$(grep '^STORE_API_KEY=' "$WH_ENV" | cut -d= -f2-)"
+  STORE_KEY_SRC="matched WarehouseDB on this machine"
+else
+  STORE_KEY="$(python3 -c 'import secrets; print(secrets.token_hex(24))')"
+  STORE_KEY_SRC="generated — set STORE_API_KEY=$STORE_KEY in WarehouseDB to match"
+fi
+
 if $USE_DOCKER; then
   install_docker_engine
   ENV_FILE="$STORE_ROOT/.env.local"
@@ -71,7 +82,7 @@ if $USE_DOCKER; then
     SECRET="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
     cat >"$ENV_FILE" <<EOF
 WAREHOUSE_URL=http://127.0.0.1:8000
-STORE_API_KEY=store-dev-key
+STORE_API_KEY=$STORE_KEY
 STORE_BACKEND_URL=http://127.0.0.1:$API_PORT
 STORE_SECRET_KEY=$SECRET
 STORE_PORT=$UI_PORT
@@ -101,10 +112,9 @@ note "virtualenv: $VENV"
 if [ ! -d "$VENV" ]; then
   "$PYTHON" -m venv "$VENV"
 fi
-note "installing API dependencies…"
-"$VENV/bin/pip" install --upgrade pip >/dev/null
-"$VENV/bin/pip" install -r "$STORE_ROOT/backend/requirements.txt"
-ok "API dependencies installed"
+"$VENV/bin/pip" install --upgrade pip >/dev/null 2>&1 || true
+spin_ok "Installing API dependencies…" "API dependencies installed" \
+  "$VENV/bin/pip" install -r "$STORE_ROOT/backend/requirements.txt"
 
 step "Configuration"
 ENV_FILE="$STORE_ROOT/.env.local"
@@ -112,7 +122,7 @@ if [ ! -f "$ENV_FILE" ]; then
   SECRET="$("$VENV/bin/python" -c 'import secrets; print(secrets.token_hex(32))')"
   cat >"$ENV_FILE" <<EOF
 WAREHOUSE_URL=http://127.0.0.1:8000
-STORE_API_KEY=store-dev-key
+STORE_API_KEY=$STORE_KEY
 STORE_BACKEND_URL=http://127.0.0.1:$API_PORT
 STORE_SECRET_KEY=$SECRET
 STORE_PORT=$UI_PORT
@@ -121,12 +131,16 @@ STORE_API_HOST=127.0.0.1
 STORE_API_PORT=$API_PORT
 EOF
   chmod 600 "$ENV_FILE"
-  ok "Created $ENV_FILE"
+  ok "Created $ENV_FILE — STORE_API_KEY $STORE_KEY_SRC"
 else
   note "updating ports in $ENV_FILE"
   set_env_kv "$ENV_FILE" STORE_PORT "$UI_PORT"
   set_env_kv "$ENV_FILE" STORE_API_PORT "$API_PORT"
   set_env_kv "$ENV_FILE" STORE_BACKEND_URL "http://127.0.0.1:$API_PORT"
+  if grep -q '^STORE_API_KEY=store-dev-key$' "$ENV_FILE"; then
+    set_env_kv "$ENV_FILE" STORE_API_KEY "$STORE_KEY"
+    warn "Updated STORE_API_KEY ($STORE_KEY_SRC)"
+  fi
 fi
 
 mkdir -p "$STORE_ROOT/instance"
@@ -149,10 +163,10 @@ ok "Database ready"
 
 step "Build"
 cd "$STORE_ROOT"
-note "installing Node dependencies + production build…"
-pnpm install --frozen-lockfile
-pnpm build
-ok "Production build ready"
+spin_ok "Installing Node dependencies…" "Node dependencies installed" \
+  pnpm install --frozen-lockfile
+spin_ok "Building production app…" "Production build ready" \
+  pnpm build
 
 chmod +x "$STORE_ROOT/start.sh" "$STORE_ROOT/run.sh"
 
