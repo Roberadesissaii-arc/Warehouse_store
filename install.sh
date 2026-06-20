@@ -33,12 +33,6 @@ done
 
 trap stop_sudo_keepalive EXIT
 
-if [ -t 1 ]; then
-  GREEN=$'\033[1;32m'; BOLD=$'\033[1m'; DIM=$'\033[2m'; RESET=$'\033[0m'
-else
-  GREEN=''; BOLD=''; DIM=''; RESET=''
-fi
-
 printf '\n%s' "$GREEN"
 cat <<'ART'
 __      ___   ___ ___ _  _  ___  _   _ ___ ___   ___ _____ ___  ___ ___
@@ -51,18 +45,20 @@ echo "  ${DIM}Customer storefront for your warehouse — your shop, your control
 echo "  ${DIM}store app: $STORE_ROOT${RESET}"
 echo
 
+step "System packages & toolchain"
 ensure_sudo
 apt_bootstrap
 ensure_node
 ensure_pnpm
 install_cloudflared
 
+step "Network ports"
 UI_PORT="$(find_free_port 5001)"
 API_PORT="$(find_free_port 5004)"
 if [ "$UI_PORT" = "$API_PORT" ]; then
   API_PORT="$(find_free_port $((UI_PORT + 1)))"
 fi
-echo "==> Ports: storefront $UI_PORT, API $API_PORT"
+ok "Ports — storefront $UI_PORT, API $API_PORT"
 
 if $USE_DOCKER; then
   install_docker_engine
@@ -85,23 +81,28 @@ EOF
     set_env_kv "$ENV_FILE" STORE_API_PORT "$API_PORT"
     set_env_kv "$ENV_FILE" STORE_BACKEND_URL "http://127.0.0.1:$API_PORT"
   fi
-  echo "==> Starting Store with Docker"
+  step "Docker"
+  note "starting Store with Docker…"
   cd "$STORE_ROOT"
   sudo docker compose up -d --build
   echo
-  echo "==> Done (Docker). Storefront: http://127.0.0.1:${UI_PORT}"
-  echo "    logs: docker compose logs -f store"
+  ok "Store running (Docker) — http://127.0.0.1:${UI_PORT}"
+  note "logs: docker compose logs -f store"
   exit 0
 fi
 
+step "Python environment"
 VENV="$STORE_ROOT/.venv"
-echo "==> Python virtualenv: $VENV"
+note "virtualenv: $VENV"
 if [ ! -d "$VENV" ]; then
   "$PYTHON" -m venv "$VENV"
 fi
+note "installing API dependencies…"
 "$VENV/bin/pip" install --upgrade pip >/dev/null
 "$VENV/bin/pip" install -r "$STORE_ROOT/backend/requirements.txt"
+ok "API dependencies installed"
 
+step "Configuration"
 ENV_FILE="$STORE_ROOT/.env.local"
 if [ ! -f "$ENV_FILE" ]; then
   SECRET="$("$VENV/bin/python" -c 'import secrets; print(secrets.token_hex(32))')"
@@ -116,9 +117,9 @@ STORE_API_HOST=127.0.0.1
 STORE_API_PORT=$API_PORT
 EOF
   chmod 600 "$ENV_FILE"
-  echo "==> Created $ENV_FILE"
+  ok "Created $ENV_FILE"
 else
-  echo "==> Updating ports in $ENV_FILE"
+  note "updating ports in $ENV_FILE"
   set_env_kv "$ENV_FILE" STORE_PORT "$UI_PORT"
   set_env_kv "$ENV_FILE" STORE_API_PORT "$API_PORT"
   set_env_kv "$ENV_FILE" STORE_BACKEND_URL "http://127.0.0.1:$API_PORT"
@@ -132,26 +133,33 @@ STORE_VENV=$VENV
 EOF
 chmod 600 "$INSTALL_META"
 
+step "Database"
+note "initialising SQLite database…"
 "$VENV/bin/python" -c "
 import sys
 sys.path.insert(0, '$STORE_ROOT/backend')
 from app import create_app
 create_app()
 "
+ok "Database ready"
 
+step "Build"
 cd "$STORE_ROOT"
+note "installing Node dependencies + production build…"
 pnpm install --frozen-lockfile
 pnpm build
+ok "Production build ready"
 
 chmod +x "$STORE_ROOT/start.sh" "$STORE_ROOT/run.sh"
 
+step "Service (auto-start on boot)"
 if $INSTALL_SERVICE; then
   RUN_USER="${SUDO_USER:-$(whoami)}"
   install_systemd warehouse-store "$STORE_ROOT/deploy/warehouse-store.service" "$STORE_ROOT" "$RUN_USER" \
     -e "s|@VENV@|$VENV|g"
-  echo "    logs: journalctl -u warehouse-store -f"
+  note "logs: journalctl -u warehouse-store -f"
 else
-  echo "Start manually: $STORE_ROOT/run.sh"
+  note "Start manually: $STORE_ROOT/run.sh"
 fi
 
 echo

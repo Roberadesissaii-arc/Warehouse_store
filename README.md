@@ -33,10 +33,12 @@ products. (Windows is supported for local development — see below.)
 
 ## Quick start
 
+**You do not install Node, pnpm, Python, or anything else first — `./install.sh` installs the
+whole toolchain for you.** Just clone and run it:
+
 ```bash
 git clone https://github.com/Roberadesissaii-arc/Warehouse_store.git
 cd Warehouse_store
-chmod +x install.sh
 ./install.sh
 ```
 
@@ -82,6 +84,9 @@ git pull && ./install.sh                  # update after pulling new code
 Optional public domain: see [deploy/CLOUDFLARE-TUNNEL.md](deploy/CLOUDFLARE-TUNNEL.md).
 
 ## Development (Windows / macOS / Linux)
+
+> For a **server install you do not need this section** — use **Quick start** above, which
+> installs Node and Python for you. These steps are for hacking on the code locally.
 
 Two processes — the Next.js UI and the Flask API. **Needs WarehouseDB on port 8000** for products.
 
