@@ -162,12 +162,7 @@ if $RESET_DB; then
   warn "--reset: wiping the existing database for a clean start"
   rm -f "$STORE_ROOT"/instance/store.db* 2>/dev/null || true
 fi
-# A stray/orphaned process holding the DB would make init block forever.
-if [ -e "$DB_FILE" ] && command -v fuser >/dev/null 2>&1 && sudo fuser -s "$DB_FILE" 2>/dev/null; then
-  warn "another process still holds the database — terminating it"
-  sudo fuser -k "$DB_FILE" 2>/dev/null || true
-  sleep 1
-fi
+free_database "$DB_FILE"
 if spin "Initialising SQLite database…" \
      timeout --kill-after=5 60 "$VENV/bin/python" -c "
 import sys
