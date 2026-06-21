@@ -157,17 +157,31 @@ EOF
 chmod 600 "$INSTALL_META"
 
 step "Database"
+DB_FILE="$STORE_ROOT/instance/store.db"
 if $RESET_DB; then
   warn "--reset: wiping the existing database for a clean start"
   rm -f "$STORE_ROOT"/instance/store.db* 2>/dev/null || true
 fi
-spin_ok "Initialising SQLite database…" "Database ready" \
-  "$VENV/bin/python" -c "
+# A stray/orphaned process holding the DB would make init block forever.
+if [ -e "$DB_FILE" ] && command -v fuser >/dev/null 2>&1 && sudo fuser -s "$DB_FILE" 2>/dev/null; then
+  warn "another process still holds the database — terminating it"
+  sudo fuser -k "$DB_FILE" 2>/dev/null || true
+  sleep 1
+fi
+if spin "Initialising SQLite database…" \
+     timeout --kill-after=5 60 "$VENV/bin/python" -c "
 import sys
 sys.path.insert(0, '$STORE_ROOT/backend')
 from app import create_app
 create_app()
-"
+"; then
+  ok "Database ready"
+else
+  rm -f "${__SPIN_LOG:-}" 2>/dev/null || true; __SPIN_LOG=""
+  warn "Database init didn't finish — something is still holding ${DB_FILE}."
+  warn "Fix: sudo fuser -k '${DB_FILE}'  (or reboot), then re-run ./install.sh"
+  fail "Could not initialise the database"
+fi
 
 step "Build"
 cd "$STORE_ROOT"
