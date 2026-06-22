@@ -17,6 +17,7 @@ PYTHON="${PYTHON:-python3}"
 INSTALL_SERVICE=true
 USE_DOCKER=false
 RESET_DB=false
+WEB_MODE=false
 
 usage() {
   sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'
@@ -28,6 +29,7 @@ while [ $# -gt 0 ]; do
     --no-service) INSTALL_SERVICE=false ;;
     --docker) USE_DOCKER=true ;;
     --reset) RESET_DB=true ;;
+    --web) WEB_MODE=true ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown option: $1" >&2; usage >&2; exit 1 ;;
   esac
@@ -35,6 +37,56 @@ while [ $# -gt 0 ]; do
 done
 
 trap stop_sudo_keepalive EXIT
+
+if $WEB_MODE; then
+  # No-sudo install triggered by the WarehouseDB "Install" button. Assumes the
+  # toolchain (node, pnpm, python3) is already present from the first setup, so
+  # it never needs apt/sudo — it clones-build-configures-runs as the current user.
+  command -v node >/dev/null 2>&1 && command -v pnpm >/dev/null 2>&1 && command -v "$PYTHON" >/dev/null 2>&1 || {
+    echo "Toolchain missing — run ./install.sh once in a terminal first." >&2; exit 1; }
+  cd "$STORE_ROOT"
+  UI_PORT="$(find_free_port 5001)"
+  API_PORT="$(find_free_port 5004)"
+  [ "$UI_PORT" = "$API_PORT" ] && API_PORT="$(find_free_port $((UI_PORT + 1)))"
+  WH_ENV="$(cd "$STORE_ROOT/.." && pwd)/WarehouseDB/instance/warehousedb.env"
+  STORE_KEY="$(grep '^STORE_API_KEY=' "$WH_ENV" 2>/dev/null | cut -d= -f2- || true)"
+  [ -n "$STORE_KEY" ] || STORE_KEY="$("$PYTHON" -c 'import secrets; print(secrets.token_hex(24))')"
+  VENV="$STORE_ROOT/.venv"
+  [ -d "$VENV" ] || "$PYTHON" -m venv "$VENV"
+  "$VENV/bin/pip" install --upgrade pip >/dev/null 2>&1 || true
+  "$VENV/bin/pip" install -r "$STORE_ROOT/backend/requirements.txt"
+  ENV_FILE="$STORE_ROOT/.env.local"
+  if [ ! -f "$ENV_FILE" ]; then
+    SECRET="$("$VENV/bin/python" -c 'import secrets; print(secrets.token_hex(32))')"
+    cat >"$ENV_FILE" <<EOF
+WAREHOUSE_URL=http://127.0.0.1:8000
+STORE_API_KEY=$STORE_KEY
+STORE_BACKEND_URL=http://127.0.0.1:$API_PORT
+STORE_SECRET_KEY=$SECRET
+STORE_PORT=$UI_PORT
+STORE_HOST=0.0.0.0
+STORE_API_HOST=127.0.0.1
+STORE_API_PORT=$API_PORT
+EOF
+    chmod 600 "$ENV_FILE"
+  else
+    set_env_kv "$ENV_FILE" STORE_PORT "$UI_PORT"
+    set_env_kv "$ENV_FILE" STORE_API_PORT "$API_PORT"
+    set_env_kv "$ENV_FILE" STORE_BACKEND_URL "http://127.0.0.1:$API_PORT"
+  fi
+  mkdir -p "$STORE_ROOT/instance"
+  cat >"$STORE_ROOT/instance/install.env" <<EOF
+STORE_ROOT=$STORE_ROOT
+STORE_VENV=$VENV
+EOF
+  "$VENV/bin/python" -c "import sys; sys.path.insert(0, '$STORE_ROOT/backend'); from app import create_app; create_app()"
+  pnpm install --frozen-lockfile
+  pnpm build
+  chmod +x "$STORE_ROOT/start.sh" "$STORE_ROOT/run.sh"
+  install_user_service warehouse-store "$STORE_ROOT" "$VENV"
+  echo "WEB_INSTALL_OK http://127.0.0.1:$UI_PORT"
+  exit 0
+fi
 
 TOTAL_STEPS=8
 if [ -t 1 ]; then clear 2>/dev/null || true; fi
